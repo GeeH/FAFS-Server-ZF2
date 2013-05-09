@@ -22,7 +22,6 @@ class CliController extends AbstractActionController
         $this->fafsServer = $fafsServer;
     }
 
-
     /**
      * Starts the server!
      */
