@@ -1,6 +1,7 @@
 <?php
 namespace FAFSServer;
 
+use FAFSServer\Controller\BrowserController;
 use FAFSServer\Controller\CliController;
 use FAFSServer\Service\FAFSServer;
 use Zend\Mvc\Controller\ControllerManager;
@@ -57,9 +58,14 @@ class Module
     {
         return array(
             'factories' => array(
-                'FAFSServer\Controller\CliController' => function(ControllerManager $controllerManager) {
+                'FAFSServer\Controller\CliController' => function (ControllerManager $controllerManager) {
                     $fafsService = $controllerManager->getServiceLocator()->get('FAFSServer\Service\FAFSServer');
                     $controller = new CliController($fafsService);
+                    return $controller;
+                },
+                'FAFSServer\Controller\BrowserController' => function (ControllerManager $controllerManager) {
+                    $fafsService = $controllerManager->getServiceLocator()->get('FAFSServer\Service\FAFSServer');
+                    $controller = new BrowserController($fafsService);
                     return $controller;
                 }
             ),

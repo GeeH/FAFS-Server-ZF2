@@ -9,6 +9,7 @@ namespace FAFSServer\Service;
 use FAFSServer\Mapper\MapperInterface;
 use FAFSServer\Mapper\TableGatewayMapper;
 use Zend\Db\Adapter\Adapter;
+use Zend\Db\Sql\Select;
 use Zend\Db\TableGateway\TableGateway;
 use Zend\EventManager\EventManagerAwareInterface;
 use Zend\EventManager\EventManagerInterface;
@@ -43,7 +44,7 @@ class FAFSServer implements EventManagerAwareInterface
     {
         $this->config = $config;
         $this->logger = $logger;
-        if(!is_null($mapper)) {
+        if (!is_null($mapper)) {
             $this->mapper = $mapper;
         }
         $tableGateway = new TableGateway('data', $adapter);
@@ -59,6 +60,7 @@ class FAFSServer implements EventManagerAwareInterface
         $this->log('info', 'Attempting to start server...');
         // get config values (or use some sane defaults)
         $ip = isset($this->config['ip']) ? $this->config['ip'] : '127.0.0.1';
+        die($ip);
         $port = isset($this->config['port']) ? $this->config['port'] : '6610';
         $length = isset($this->config['maxLength']) ? $this->config['maxLength'] : 1024;
 
@@ -91,6 +93,75 @@ class FAFSServer implements EventManagerAwareInterface
     }
 
     /**
+     * @return null|\Zend\Db\ResultSet\ResultSetInterface
+     */
+    public function getAllKeys()
+    {
+        return $this->mapper->getAllKeys();
+    }
+
+    public function getData(\DateTime $dateFrom, \DateTime $dateTo, $interval, $keys)
+    {
+        switch ($interval) {
+            case 'minutes':
+                $intervalString = new \DateInterval('PT1M');
+                $dateFormat = 'd-m-Y H:i';
+                break;
+            case 'hours':
+                $intervalString = new \DateInterval('PT1H');
+                $dateFormat = 'd-m-Y H';
+                break;
+            default:
+                $intervalString = new \DateInterval('P1D');
+                $dateFormat = 'd-m-Y';
+                break;
+        }
+        $data = $this->mapper->getData($dateFrom, $dateTo, $interval, $keys);
+        $titles = array('Interval');
+        $titles = array_merge($titles, array_keys($data));
+        $returnData[] = $titles;
+        while ($dateFrom <= $dateTo) {
+            $formattedDate = $dateFrom->format($dateFormat);
+            $rowData = array();
+            $rowData[] = $formattedDate;
+            foreach ($keys as $key) {
+                $value = 0;
+                if(isset($data[$key][0]) && $data[$key][0]['Expression1'] === $formattedDate) {
+                    $value = (int)$data[$key][0]['Expression2'];
+                    array_shift($data[$key]);
+                }
+                $rowData[] = $value;
+            }
+
+            $returnData[] = $rowData;
+            $dateFrom = $dateFrom->add($intervalString);
+        }
+        return $returnData;
+    }
+
+    /**
+     * @return void|EventManagerInterface
+     */
+    public function getEventManager()
+    {
+
+        return $this->eventManager;
+    }
+
+    /**
+     * @param EventManagerInterface $eventManager
+     */
+    public function setEventManager(EventManagerInterface $eventManager)
+    {
+        $eventManager->addIdentifiers(
+            array(
+                get_called_class()
+            )
+        );
+        $this->eventManager = $eventManager;
+    }
+
+    /**
      * @param $data
      * @return bool
      */
@@ -102,7 +173,7 @@ class FAFSServer implements EventManagerAwareInterface
             return false;
         }
         foreach ($decodedData as $decodedRow) {
-            if(!is_array($decodedRow) || !$this->validateRow($decodedRow)) {
+            if (!is_array($decodedRow) || !$this->validateRow($decodedRow)) {
                 $this->log('err', 'Malformed data row: ' . $decodedRow);
                 return false;
             }
@@ -151,26 +222,6 @@ class FAFSServer implements EventManagerAwareInterface
     public function isValidKey($string)
     {
         return preg_match('^[a-zA-Z0-9.]{1,}$^', $string) === 1;
-    }
-
-    /**
-     * @param EventManagerInterface $eventManager
-     */
-    public function setEventManager(EventManagerInterface $eventManager)
-    {
-        $eventManager->addIdentifiers(array(
-            get_called_class()
-        ));
-        $this->eventManager = $eventManager;
-    }
-
-    /**
-     * @return void|EventManagerInterface
-     */
-    public function getEventManager()
-    {
-
-        return $this->eventManager;
     }
 
 }
